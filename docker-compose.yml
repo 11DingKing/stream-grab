@@ -1,0 +1,35 @@
+services:
+  stream-downloader:
+    image: stream-downloader:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: stream-downloader
+    volumes:
+      # 挂载输出目录
+      - ./output:/app/output
+      # 挂载日志目录
+      - ./logs:/app/logs
+    environment:
+      - TZ=Asia/Shanghai
+    # 使用交互模式运行
+    stdin_open: true
+    tty: true
+    # 网络配置 - 使用默认bridge模式（host模式在macOS Docker Desktop不可用）
+    # network_mode: host
+    # 重启策略
+    restart: "no"
+
+  # 测试服务
+  test:
+    image: stream-downloader-test:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.test
+    container_name: stream-downloader-test
+    profiles:
+      - test
+
+networks:
+  default:
+    driver: bridge

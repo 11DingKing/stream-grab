@@ -1,0 +1,97 @@
+# =========================
+# .NET / C# 项目
+# =========================
+
+## Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+## NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## Build
+*.dll
+*.exe
+*.pdb
+*.mdb
+
+## Rider
+.idea/
+*.sln.iml
+
+## VS Code
+.vscode/
+
+# =========================
+# 项目特定
+# =========================
+
+## 输出目录
+downloads/
+output/
+
+## 临时文件
+temp/
+tmp/
+*.tmp
+*.temp
+
+## 日志文件
+logs/
+*.log
+
+# =========================
+# 操作系统
+# =========================
+
+## macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+## Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+## Linux
+*~
+
+# =========================
+# Docker
+# =========================
+.docker/
+
+# =========================
+# 其他
+# =========================
+*.bak
+*.swp
+*.orig

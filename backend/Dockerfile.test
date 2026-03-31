@@ -1,0 +1,18 @@
+# 测试专用 Dockerfile
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS test
+ARG TARGETARCH
+WORKDIR /src
+
+# 复制解决方案和项目文件
+COPY StreamDownloader.sln .
+COPY StreamDownloader/StreamDownloader.csproj StreamDownloader/
+COPY StreamDownloader.Tests/StreamDownloader.Tests.csproj StreamDownloader.Tests/
+
+# 还原依赖
+RUN dotnet restore -a $TARGETARCH
+
+# 复制源代码
+COPY . .
+
+# 运行测试
+ENTRYPOINT ["dotnet", "test", "--no-restore", "--verbosity", "normal"]
