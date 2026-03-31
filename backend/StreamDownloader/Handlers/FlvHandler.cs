@@ -1,6 +1,7 @@
 using Serilog;
 using StreamDownloader.Core;
 using StreamDownloader.Models;
+using StreamDownloader.Utils;
 
 namespace StreamDownloader.Handlers;
 
@@ -66,7 +67,7 @@ public class FlvHandler : IStreamHandler
         return streamInfo;
     }
 
-    public async Task<byte[]> DownloadSegmentAsync(Segment segment, HttpClient httpClient, CancellationToken cancellationToken = default)
+    public async Task<byte[]> DownloadSegmentAsync(Segment segment, HttpClient httpClient, DownloadOptions options, CancellationToken cancellationToken = default)
     {
         // 对于有明确大小的静态FLV文件，使用流式下载到临时文件避免内存溢出
         // 对于直播流，应使用 RecordLiveStreamAsync 方法
@@ -79,11 +80,16 @@ public class FlvHandler : IStreamHandler
         // 如果文件较大（>50MB），使用临时文件避免内存溢出
         if (contentLength.HasValue && contentLength.Value > 50 * 1024 * 1024)
         {
-            return await DownloadLargeFileAsync(response, segment, cancellationToken);
+            return await DownloadLargeFileAsync(response, segment, options, cancellationToken);
         }
 
         // 小文件或未知大小的有限流，使用内存缓冲
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var inputStream = options.SpeedLimit > 0 
+            ? new ThrottledStream(stream, options.SpeedLimit * 1024) 
+            : stream;
+        
+        await using var inputStreamDisposable = inputStream;
         using var memoryStream = new MemoryStream();
         
         var buffer = new byte[BufferSize];
@@ -91,7 +97,7 @@ public class FlvHandler : IStreamHandler
         long totalBytes = 0;
         const long maxMemoryBytes = 50 * 1024 * 1024; // 内存缓冲上限50MB
 
-        while ((bytesRead = await stream.ReadAsync(buffer, cancellationToken)) > 0)
+        while ((bytesRead = await inputStream.ReadAsync(buffer, cancellationToken)) > 0)
         {
             await memoryStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
             totalBytes += bytesRead;
@@ -116,19 +122,24 @@ public class FlvHandler : IStreamHandler
     /// <summary>
     /// 大文件流式下载到临时文件，避免内存溢出
     /// </summary>
-    private async Task<byte[]> DownloadLargeFileAsync(HttpResponseMessage response, Segment segment, CancellationToken cancellationToken)
+    private async Task<byte[]> DownloadLargeFileAsync(HttpResponseMessage response, Segment segment, DownloadOptions options, CancellationToken cancellationToken)
     {
         var tempFile = Path.GetTempFileName();
         try
         {
             await using var networkStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            var inputStream = options.SpeedLimit > 0 
+                ? new ThrottledStream(networkStream, options.SpeedLimit * 1024) 
+                : networkStream;
+            
+            await using var inputStreamDisposable = inputStream;
             await using var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, BufferSize);
 
             var buffer = new byte[BufferSize];
             int bytesRead;
             long totalBytes = 0;
 
-            while ((bytesRead = await networkStream.ReadAsync(buffer, cancellationToken)) > 0)
+            while ((bytesRead = await inputStream.ReadAsync(buffer, cancellationToken)) > 0)
             {
                 await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
                 totalBytes += bytesRead;
@@ -214,6 +225,11 @@ public class FlvHandler : IStreamHandler
         response.EnsureSuccessStatusCode();
 
         await using var networkStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var inputStream = options.SpeedLimit > 0 
+            ? new ThrottledStream(networkStream, options.SpeedLimit * 1024) 
+            : networkStream;
+        
+        await using var inputStreamDisposable = inputStream;
         await using var fileStream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.Read, BufferSize);
 
         var buffer = new byte[BufferSize];
@@ -223,7 +239,7 @@ public class FlvHandler : IStreamHandler
 
         try
         {
-            while ((bytesRead = await networkStream.ReadAsync(buffer, cancellationToken)) > 0)
+            while ((bytesRead = await inputStream.ReadAsync(buffer, cancellationToken)) > 0)
             {
                 await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
                 totalBytes += bytesRead;

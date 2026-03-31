@@ -115,7 +115,7 @@ public class StreamDownloaderService : IStreamDownloader
                     }
 
                     segment.Status = SegmentStatus.Downloading;
-                    var data = await handler.DownloadSegmentAsync(segment, httpClient, cancellationToken);
+                    var data = await handler.DownloadSegmentAsync(segment, httpClient, options, cancellationToken);
                     
                     await File.WriteAllBytesAsync(segmentPath, data, cancellationToken);
                     segment.LocalPath = segmentPath;
@@ -169,7 +169,7 @@ public class StreamDownloaderService : IStreamDownloader
                         {
                             await Task.Delay(TimeSpan.FromSeconds(options.RetryDelay), cancellationToken);
                             var segmentPath = Path.Combine(tempDir, $"segment_{segment.Index:D6}.ts");
-                            var data = await handler.DownloadSegmentAsync(segment, httpClient, cancellationToken);
+                            var data = await handler.DownloadSegmentAsync(segment, httpClient, options, cancellationToken);
                             await File.WriteAllBytesAsync(segmentPath, data, cancellationToken);
                             segment.LocalPath = segmentPath;
                             segment.Status = SegmentStatus.Completed;
