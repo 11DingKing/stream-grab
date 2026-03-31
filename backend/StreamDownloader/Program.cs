@@ -88,6 +88,11 @@ class Program
             description: "Live stream playlist poll interval in seconds",
             getDefaultValue: () => 5);
 
+        var speedLimitOption = new Option<long>(
+            aliases: new[] { "--speed-limit" },
+            description: "Download speed limit in KB/s (0 = unlimited)",
+            getDefaultValue: () => 0);
+
         var rootCommand = new RootCommand("Stream Downloader - Download live streams from various protocols")
         {
             urlArgument,
@@ -100,7 +105,8 @@ class Program
             verboseOption,
             durationOption,
             maxSizeOption,
-            pollIntervalOption
+            pollIntervalOption,
+            speedLimitOption
         };
 
         rootCommand.SetHandler(async (context) =>
@@ -116,6 +122,7 @@ class Program
             var duration = context.ParseResult.GetValueForOption(durationOption);
             var maxSize = context.ParseResult.GetValueForOption(maxSizeOption);
             var pollInterval = context.ParseResult.GetValueForOption(pollIntervalOption);
+            var speedLimit = context.ParseResult.GetValueForOption(speedLimitOption);
 
             // 重新配置日志（如果需要详细模式）
             if (verbose)
@@ -132,7 +139,8 @@ class Program
                 Proxy = proxy,
                 LiveDuration = TimeSpan.FromSeconds(duration),
                 MaxFileSize = maxSize * 1024 * 1024, // Convert MB to bytes
-                LivePollInterval = pollInterval
+                LivePollInterval = pollInterval,
+                SpeedLimit = speedLimit
             };
 
             // 解析自定义headers
