@@ -30,7 +30,7 @@ public interface IStreamHandler
     /// <summary>
     /// 下载分片
     /// </summary>
-    Task<byte[]> DownloadSegmentAsync(Segment segment, HttpClient httpClient, CancellationToken cancellationToken = default);
+    Task<byte[]> DownloadSegmentAsync(Segment segment, HttpClient httpClient, DownloadOptions options, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 合并分片
