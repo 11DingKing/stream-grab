@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Serilog;
 using StreamDownloader.Core;
 using StreamDownloader.Models;
+using StreamDownloader.Utils;
 
 namespace StreamDownloader.Handlers;
 
@@ -162,7 +163,7 @@ public class HlsHandler : IStreamHandler
                             // 下载分片
                             try
                             {
-                                var data = await DownloadSegmentAsync(segment, httpClient, cancellationToken);
+                                var data = await DownloadSegmentAsync(segment, httpClient, options.SpeedLimit, cancellationToken);
                                 await outputStream.WriteAsync(data, cancellationToken);
                                 await outputStream.FlushAsync(cancellationToken);
 
@@ -227,9 +228,25 @@ public class HlsHandler : IStreamHandler
         });
     }
 
-    public async Task<byte[]> DownloadSegmentAsync(Segment segment, HttpClient httpClient, CancellationToken cancellationToken = default)
+    public async Task<byte[]> DownloadSegmentAsync(Segment segment, HttpClient httpClient, long speedLimitKb = 0, CancellationToken cancellationToken = default)
     {
-        var data = await httpClient.GetByteArrayAsync(segment.Url, cancellationToken);
+        byte[] data;
+        var maxBytesPerSecond = speedLimitKb * 1024;
+
+        if (maxBytesPerSecond > 0)
+        {
+            using var response = await httpClient.GetAsync(segment.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            await using var networkStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            await using var throttledStream = new ThrottledStream(networkStream, maxBytesPerSecond);
+            using var memoryStream = new MemoryStream();
+            await throttledStream.CopyToAsync(memoryStream, cancellationToken);
+            data = memoryStream.ToArray();
+        }
+        else
+        {
+            data = await httpClient.GetByteArrayAsync(segment.Url, cancellationToken);
+        }
 
         // 如果有加密，解密数据
         if (segment.Encryption != null && 
