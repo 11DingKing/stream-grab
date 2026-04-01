@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Serilog;
 using StreamDownloader.Core;
 using StreamDownloader.Models;
+using StreamDownloader.Utils;
 
 namespace StreamDownloader.Handlers;
 
@@ -162,7 +163,7 @@ public class HlsHandler : IStreamHandler
                             // 下载分片
                             try
                             {
-                                var data = await DownloadSegmentAsync(segment, httpClient, cancellationToken);
+                                var data = await DownloadSegmentAsync(segment, httpClient, options, cancellationToken);
                                 await outputStream.WriteAsync(data, cancellationToken);
                                 await outputStream.FlushAsync(cancellationToken);
 
@@ -227,19 +228,51 @@ public class HlsHandler : IStreamHandler
         });
     }
 
-    public async Task<byte[]> DownloadSegmentAsync(Segment segment, HttpClient httpClient, CancellationToken cancellationToken = default)
+    public async Task<byte[]> DownloadSegmentAsync(Segment segment, HttpClient httpClient, DownloadOptions options, CancellationToken cancellationToken = default)
     {
-        var data = await httpClient.GetByteArrayAsync(segment.Url, cancellationToken);
+        if (options.SpeedLimit <= 0)
+        {
+            var data = await httpClient.GetByteArrayAsync(segment.Url, cancellationToken);
+
+            // 如果有加密，解密数据
+            if (segment.Encryption != null && 
+                segment.Encryption.Method == "AES-128" && 
+                segment.Encryption.KeyData != null)
+            {
+                data = DecryptAes128(data, segment.Encryption.KeyData, segment.Encryption.IV, segment.Index);
+            }
+
+            return data;
+        }
+
+        // 限速模式：使用节流流控制读取速度
+        using var response = await httpClient.GetAsync(segment.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var maxBytesPerSecond = options.SpeedLimit * 1024;
+        await using var throttledStream = new ThrottledStream(stream, maxBytesPerSecond);
+
+        using var memoryStream = new MemoryStream();
+        var buffer = new byte[81920];
+        int bytesRead;
+
+        while ((bytesRead = await throttledStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+        {
+            await memoryStream.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+        }
+
+        var result = memoryStream.ToArray();
 
         // 如果有加密，解密数据
         if (segment.Encryption != null && 
             segment.Encryption.Method == "AES-128" && 
             segment.Encryption.KeyData != null)
         {
-            data = DecryptAes128(data, segment.Encryption.KeyData, segment.Encryption.IV, segment.Index);
+            result = DecryptAes128(result, segment.Encryption.KeyData, segment.Encryption.IV, segment.Index);
         }
 
-        return data;
+        return result;
     }
 
     public async Task MergeSegmentsAsync(IEnumerable<string> segmentPaths, string outputPath, CancellationToken cancellationToken = default)

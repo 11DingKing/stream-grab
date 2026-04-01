@@ -69,4 +69,9 @@ public class DownloadOptions
     /// 直播流最大文件大小限制（字节，0表示无限制）
     /// </summary>
     public long MaxFileSize { get; set; } = 0;
+
+    /// <summary>
+    /// 下载速度限制（KB/s，0表示无限制）
+    /// </summary>
+    public long SpeedLimit { get; set; } = 0;
 }
