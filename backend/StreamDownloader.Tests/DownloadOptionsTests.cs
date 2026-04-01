@@ -22,6 +22,20 @@ public class DownloadOptionsTests
         options.KeepTempFiles.Should().BeFalse();
         options.RetryCount.Should().Be(3);
         options.RetryDelay.Should().Be(2);
+        options.SpeedLimit.Should().Be(0);
+    }
+
+    [Fact]
+    public void SpeedLimit_CanBeSet()
+    {
+        // Arrange
+        var options = new DownloadOptions();
+
+        // Act
+        options.SpeedLimit = 500;
+
+        // Assert
+        options.SpeedLimit.Should().Be(500);
     }
 
     [Fact]
